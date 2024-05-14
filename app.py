@@ -18,7 +18,7 @@ if "dash_dir" not in st.session_state:
 
 
 timedata_df = load_time_data(
-    os.path.join(st.session_state["dash_dir"], "processed_files/time_series_data_2.csv")
+    os.path.join(st.session_state["dash_dir"], "processed_files/time_series_data_3.csv")
 ).sort_values("code")
 
 with st.sidebar:
@@ -32,7 +32,9 @@ with st.sidebar:
 
 st.title(f"Surface elevation change for the period {periods[time_period]}")
 st.image(
-    os.path.join(st.session_state["dash_dir"], f"processed_files/images/{codes[time_period]}.png")
+    os.path.join(
+        st.session_state["dash_dir"], f"processed_files/images/run052024/{codes[time_period]}.png"
+    )
 )
 
 basin_selection = st.multiselect(
@@ -86,15 +88,17 @@ if len(basin_selection) != 0:
     bar_chart = line + zero_rule + rules + points
 
     bar_chart = bar_chart.repeat(layer=basin_selection)
-    
+
     map = (
-    alt.Chart(
-        ais_basins.reset_index().to_crs("epsg:4326"),
+        alt.Chart(
+            ais_basins.reset_index().to_crs("epsg:4326"),
+        )
+        .mark_geoshape()
+        .encode(
+            color="basin_id:N", opacity=alt.condition(click_state, alt.value(1), alt.value(0.2))
+        )
+        .project(type="stereographic")
     )
-    .mark_geoshape()
-    .encode(color="basin_id:N", opacity=alt.condition(click_state, alt.value(1), alt.value(0.2)))
-    .project(type="stereographic")
-)
 
     st.altair_chart(bar_chart.interactive(), use_container_width=True)
 else:
