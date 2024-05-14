@@ -65,9 +65,9 @@ line = base.mark_line().encode(
         alt.repeat("layer"),
         type="quantitative",
         scale=alt.Scale(domain=(-max_v, max_v)),
-        opacity=alt.condition(click_state, alt.value(1), alt.value(0)),
         title="Mean elevation change (m/year)",
     ),
+    opacity=alt.condition(click_state, alt.value(1), alt.value(0)),
     color=alt.datum(alt.repeat("layer")),
 )
 
@@ -82,7 +82,7 @@ rules = (
         ]
         + [
             alt.Tooltip(str(c), type="quantitative", format=".4f")
-            for c in ais_basins["basin_id"].astype(str)
+            for c in ais_basins["basin_id"].to_numpy().astype(str)
         ],
     )
     .add_params(nearest)
