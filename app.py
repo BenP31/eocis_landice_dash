@@ -95,17 +95,6 @@ if len(basin_selection) != 0:
 
     bar_chart = bar_chart.repeat(layer=basin_selection)
 
-    map = (
-        alt.Chart(
-            ais_basins.reset_index().to_crs("epsg:4326"),
-        )
-        .mark_geoshape()
-        .encode(
-            color="basin_id:N", opacity=alt.condition(click_state, alt.value(1), alt.value(0.2))
-        )
-        .project(type="stereographic")
-    )
-
     st.altair_chart(bar_chart.interactive(), use_container_width=True)
 else:
     st.text("No data selected to plot")
