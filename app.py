@@ -1,6 +1,7 @@
 import os
 
 import altair as alt
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -16,6 +17,11 @@ def load_time_data(filename):
 if "dash_dir" not in st.session_state:
     st.session_state["dash_dir"] = os.environ.get("DASH_DIR", os.getcwd())
 
+ais_basins = gpd.read_file(
+    os.path.join(
+        st.session_state["dash_dir"], "aux_files", "IMBIE_AIS_Basins", "ANT_Basins_IMBIE2_v1.6.shp"
+    )
+)
 
 timedata_df = load_time_data(
     os.path.join(st.session_state["dash_dir"], "processed_files/time_series_data_3.csv")
