@@ -44,7 +44,7 @@ st.image(
     )
 )
 
-max_v = np.round(timedata_df.abs().max(axis=None) + 0.05, 1)
+max_v = np.round(timedata_df.drop(columns=["code", "period"]).abs().max(axis=None) + 0.05, 1)
 
 click_state = alt.selection_point(fields=["basin_id"])
 
@@ -97,7 +97,7 @@ zero_rule = (
 
 bar_chart = line + zero_rule + rules + points
 
-bar_chart = bar_chart.repeat(layer=ais_basins["basin_id"].astype(str))
+bar_chart = bar_chart.repeat(layer=ais_basins["basin_id"].to_numpy().astype(str))
 
 chart = bar_chart & map
 
