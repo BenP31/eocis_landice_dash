@@ -13,7 +13,7 @@ from shapely.geometry import Point
 file_years_re = re.compile("[0-9]{6}-[0-9]{6}")
 
 # Using IMBIE definitions, basin ids are 0-18
-csv_columns = ["code", "period", "all", *[str(i) for i in range(19)]]
+csv_columns = ["code", "period", "basin", "SEC"]
 
 
 def get_data_files(folder: str):
@@ -158,14 +158,27 @@ if __name__ == "__main__":
         if fmt_year not in ts_existing_entries:
             # get mean data and add to csv
             ts_data = get_mean_data(my_data, "SEC")
-            str_dict = {str(k): v for k, v in ts_data.items()}
-            ts_data = str_dict
-            ts_data.update({"code": file_year, "period": fmt_year})
             with open(time_series_file, "a") as time_series_file_fp:
                 ts_writer = csv.DictWriter(
                     time_series_file_fp, fieldnames=csv_columns, delimiter=","
                 )
-                ts_writer.writerow(ts_data)
+                for k, v in ts_data.items():
+                    out_dict = {
+                        "code": file_year,
+                        "period": fmt_year,
+                        "basin": k,
+                        "SEC": v,
+                    }
+                    ts_writer.writerow(out_dict)
+
+            # str_dict = {str(k): v for k, v in ts_data.items()}
+            # ts_data = str_dict
+            # ts_data.update({"code": file_year, "period": fmt_year})
+            # with open(time_series_file, "a") as time_series_file_fp:
+            #     ts_writer = csv.DictWriter(
+            #         time_series_file_fp, fieldnames=csv_columns, delimiter=","
+            #     )
+            #     ts_writer.writerow(ts_data)
 
         print(" O", end="", flush=True)
 
