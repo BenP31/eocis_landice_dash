@@ -1,6 +1,7 @@
 import csv
 import os
 import re
+import sys
 from glob import glob
 
 import cartopy.crs as ccrs
@@ -13,7 +14,7 @@ from shapely.geometry import Point
 file_years_re = re.compile("[0-9]{6}-[0-9]{6}")
 
 # Using IMBIE definitions, basin ids are 0-18
-csv_columns = ["code", "period", "basin", "SEC"]
+csv_columns = ["code", "period", "midpoint", "basin", "SEC"]
 
 
 def get_data_files(folder: str):
@@ -21,13 +22,12 @@ def get_data_files(folder: str):
         yield f
 
 
-def plot_val(
+def plot_antarc(
     gp_dataframe: gpd.GeoDataFrame,
     shp_dataframe: gpd.GeoDataFrame,
     plot_val,
     x_values,
     y_values,
-    extra=False,
 ):
     crs_3031 = ccrs.Stereographic(central_latitude=-90, true_scale_latitude=-71)
 
@@ -64,6 +64,47 @@ def plot_val(
     return fig
 
 
+def plot_greenl(
+    gp_dataframe: gpd.GeoDataFrame,
+    shp_dataframe: gpd.GeoDataFrame,
+    plot_val,
+    x_values,
+    y_values,
+):
+
+    crs_new = ccrs.Mercator(central_longitude=42.6)
+    transformed = my_data.to_crs(crs_new)
+
+    fig, ax = plt.subplots(
+        figsize=(9, 7), facecolor="white", subplot_kw=dict(projection=crs_new)
+    )  # Create our plot
+
+    transformed[transformed["SEC"].notna()].plot(
+        column="SEC",
+        ax=ax,
+        legend=True,
+        vmax=2,
+        vmin=-2,
+        marker="s",
+        markersize=(fig.get_figwidth() * fig.get_dpi()) / len(x_values),
+        cmap="bwr_r",
+    )
+
+    shp_dataframe.to_crs(crs_new).plot(color="none", edgecolor="black", ax=ax, alpha=0.5, lw=0.7)
+
+    gl = ax.gridlines(draw_labels=True, color="black", alpha=0.25)
+    gl.ylabel_style = {
+        "color": "black",
+    }
+
+    x_max, x_min = np.max(x_values.flatten()), np.min(x_values.flatten())
+    y_max, y_min = np.max(y_values.flatten()), np.min(y_values.flatten())
+    ax.set_xlim(x_min * 1.05, x_max * 1.05)
+    ax.set_ylim(y_min * 1.05, y_max * 1.05)
+
+    return fig
+
+
 def get_mean_data(gp_dataframe: gpd.GeoDataFrame, column_name: str) -> dict:
     basin_means = (
         gp_dataframe[gp_dataframe.notna()][[column_name, "basin_id"]]
@@ -79,6 +120,9 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser("EOCIS data processing script")
+    parser.add_argument(
+        "-a", "--area", help="Choose between Greenland and Anarctica", choices=["GIS", "AIS"]
+    )
     parser.add_argument(
         "-x", "--aux_file_dir", help="Directory for auxillary files (shapefiles, etc.)"
     )
@@ -96,6 +140,7 @@ if __name__ == "__main__":
     data_file_dir = argv.data_file_dir
     time_series_file = argv.time_series_file
     aux_file_dir = argv.aux_file_dir
+    arg_area = argv.area
 
     ts_existing_entries = []
     if os.path.exists(time_series_file):
@@ -112,6 +157,18 @@ if __name__ == "__main__":
 
     landice_files = get_data_files(data_file_dir)
 
+    # load shapefile
+    if arg_area == "AIS":
+        basin_df = gpd.read_file(
+            os.path.join(aux_file_dir, "IMBIE_AIS_Basins", "ANT_Basins_IMBIE2_v1.6.shp")
+        )
+    elif arg_area == "GIS":
+        basin_df = gpd.read_file(
+            os.path.join(aux_file_dir, "IMBIE_GIS_Basins", "Greenland_Basins_PS_v1.4.2.shp")
+        )
+    else:
+        sys.exit("Invalid area selection")
+
     for file_name in landice_files:
         print("Processing ", file_name, end="", flush=True)
         years = file_years_re.findall(file_name)
@@ -124,11 +181,6 @@ if __name__ == "__main__":
         if file_year in ts_existing_entries and file_year + ".png" in image_files:
             print(" O O (Skipped)")
             continue
-
-        # load shapefile
-        ais_basins = gpd.read_file(
-            os.path.join(aux_file_dir, "IMBIE_AIS_Basins", "ANT_Basins_IMBIE2_v1.6.shp")
-        )
 
         # load nc
         nc = Dataset(os.path.join(data_file_dir, file_name))
@@ -158,6 +210,7 @@ if __name__ == "__main__":
         if fmt_year not in ts_existing_entries:
             # get mean data and add to csv
             ts_data = get_mean_data(my_data, "SEC")
+            midpoint = (nc["start_time"][:].data[0] + nc["end_time"][:].data[0])/2
             with open(time_series_file, "a") as time_series_file_fp:
                 ts_writer = csv.DictWriter(
                     time_series_file_fp, fieldnames=csv_columns, delimiter=","
@@ -166,6 +219,7 @@ if __name__ == "__main__":
                     out_dict = {
                         "code": file_year,
                         "period": fmt_year,
+                        "midpoint": midpoint,
                         "basin": k,
                         "SEC": v,
                     }
@@ -184,7 +238,12 @@ if __name__ == "__main__":
 
         if file_year + ".png" not in image_files:
             # generate image and save in images folder
-            fig = plot_val(my_data[my_data.notna()], ais_basins, "SEC", x_values, y_values)
+            if arg_area == "AIS":
+                fig = plot_antarc(my_data[my_data.notna()], basin_df, "SEC", x_values, y_values)
+            elif arg_area == "GIS":
+                fig = plot_greenl(my_data[my_data.notna()], basin_df, "SEC", x_values, y_values)
+            else:
+                sys.exit("Invalid area selection")
             fig.savefig(os.path.join(image_dir, file_year + ".png"))
             plt.close()
 
