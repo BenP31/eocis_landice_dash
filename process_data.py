@@ -73,20 +73,20 @@ def plot_greenl(
 ):
 
     crs_new = ccrs.Mercator(central_longitude=42.6)
-    transformed = my_data.to_crs(crs_new)
 
     fig, ax = plt.subplots(
         figsize=(9, 7), facecolor="white", subplot_kw=dict(projection=crs_new)
     )  # Create our plot
 
-    transformed[transformed["SEC"].notna()].plot(
-        column="SEC",
+    gp_dataframe.to_crs(crs_new).plot(
+        column=plot_val,
         ax=ax,
         legend=True,
         vmax=2,
         vmin=-2,
-        marker="s",
-        markersize=(fig.get_figwidth() * fig.get_dpi()) / len(x_values),
+        marker=".",
+        linewidths=0,
+        markersize=1,
         cmap="bwr_r",
     )
 
@@ -97,10 +97,8 @@ def plot_greenl(
         "color": "black",
     }
 
-    x_max, x_min = np.max(x_values.flatten()), np.min(x_values.flatten())
-    y_max, y_min = np.max(y_values.flatten()), np.min(y_values.flatten())
-    ax.set_xlim(x_min * 1.05, x_max * 1.05)
-    ax.set_ylim(y_min * 1.05, y_max * 1.05)
+    ax.set_xlim(-13147697, -6536006)
+    ax.set_ylim(7930354, 17981513)
 
     return fig
 
@@ -162,10 +160,12 @@ if __name__ == "__main__":
         basin_df = gpd.read_file(
             os.path.join(aux_file_dir, "IMBIE_AIS_Basins", "ANT_Basins_IMBIE2_v1.6.shp")
         )
+        crs = "epsg:3031"
     elif arg_area == "GIS":
         basin_df = gpd.read_file(
             os.path.join(aux_file_dir, "IMBIE_GIS_Basins", "Greenland_Basins_PS_v1.4.2.shp")
         )
+        crs = "epsg:3413"
     else:
         sys.exit("Invalid area selection")
 
@@ -189,12 +189,13 @@ if __name__ == "__main__":
         surf_type = nc["surface_type"][:].data
         sec = nc["sec"][:].data[0, :, :]
         basin_id = nc["basin_id"][:].data
-        basin_id[basin_id == -25] = 0
 
-        coords = []
-        for y in y_values:
-            for x in x_values:
-                coords.append(Point(x, y))
+        # Error in basin number for AIS
+        if arg_area == "AIS":
+            basin_id[basin_id == -25] = 0
+
+        x_coords, y_coords = np.meshgrid(x_values, y_values, indexing="xy")
+        coords_arr = [Point(x, y) for x, y in zip(x_coords.flatten(), y_coords.flatten())]
 
         # make dataframe here
         my_data = gpd.GeoDataFrame(
@@ -202,15 +203,15 @@ if __name__ == "__main__":
                 "SEC": sec.flatten(),
                 "basin_id": basin_id.flatten(),
                 "surface_type": surf_type.flatten(),
-                "geometry": coords,
+                "geometry": coords_arr,
             },
-            crs="epsg:3031",
+            crs=crs,
         )
 
         if fmt_year not in ts_existing_entries:
             # get mean data and add to csv
             ts_data = get_mean_data(my_data, "SEC")
-            midpoint = (nc["start_time"][:].data[0] + nc["end_time"][:].data[0])/2
+            midpoint = (nc["start_time"][:].data[0] + nc["end_time"][:].data[0]) / 2
             with open(time_series_file, "a") as time_series_file_fp:
                 ts_writer = csv.DictWriter(
                     time_series_file_fp, fieldnames=csv_columns, delimiter=","
@@ -224,15 +225,6 @@ if __name__ == "__main__":
                         "SEC": v,
                     }
                     ts_writer.writerow(out_dict)
-
-            # str_dict = {str(k): v for k, v in ts_data.items()}
-            # ts_data = str_dict
-            # ts_data.update({"code": file_year, "period": fmt_year})
-            # with open(time_series_file, "a") as time_series_file_fp:
-            #     ts_writer = csv.DictWriter(
-            #         time_series_file_fp, fieldnames=csv_columns, delimiter=","
-            #     )
-            #     ts_writer.writerow(ts_data)
 
         print(" O", end="", flush=True)
 
