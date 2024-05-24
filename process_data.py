@@ -72,7 +72,7 @@ def plot_greenl(
     y_values,
 ):
 
-    crs_new = ccrs.Mercator(central_longitude=42.6)
+    crs_new = ccrs.NorthPolarStereo(central_longitude=-40)
 
     fig, ax = plt.subplots(
         figsize=(9, 7), facecolor="white", subplot_kw=dict(projection=crs_new)
@@ -96,9 +96,6 @@ def plot_greenl(
     gl.ylabel_style = {
         "color": "black",
     }
-
-    ax.set_xlim(-13147697, -6536006)
-    ax.set_ylim(7930354, 17981513)
 
     return fig
 
