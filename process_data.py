@@ -84,8 +84,7 @@ def plot_greenl(
         legend=True,
         vmax=2,
         vmin=-2,
-        marker=".",
-        linewidths=0,
+        marker="s",
         markersize=1,
         cmap="bwr_r",
     )
